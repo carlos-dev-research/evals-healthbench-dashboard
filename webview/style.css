@@ -4,7 +4,8 @@
   Plain CSS, no framework. Colors are defined once as variables in :root and
   swapped for dark mode by the prefers-color-scheme block, so the page follows
   the system theme. Sections below: base layout, tables and the runs list,
-  summary tiles, histogram, conversation list, and the rubric outcome pills.
+  summary tiles, histogram, conversation list, rendered Markdown, the rubric
+  table, and the New run view (tabs, form, progress).
 */
 
 /* Light theme colors */
@@ -43,6 +44,7 @@
 
 /* ---------- Base layout and typography ---------- */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* keep the hidden attribute working on elements styled with display */
 
 body {
   margin: 0;
@@ -251,3 +253,92 @@ summary .badge { font-variant-numeric: tabular-nums; font-weight: 600; }
 .pill.penalty { color: var(--bad); background: var(--bad-bg); }
 .pos { color: var(--good); }
 .neg { color: var(--bad); }
+.pill.status-running, .pill.status-starting { color: var(--accent); background: var(--neutral-bg); }
+.pill.status-completed { color: var(--good); background: var(--good-bg); }
+.pill.status-cancelled { color: var(--muted); background: var(--neutral-bg); }
+.pill.status-failed { color: var(--bad); background: var(--bad-bg); }
+
+/* Rubric criterion text with its tags, and the grader's explanation */
+.rubrics td.criterion-cell { min-width: 260px; }
+.rubrics .criterion { font-weight: 500; }
+.rubrics td.explanation { color: var(--muted); min-width: 240px; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tag {
+  font-size: 0.72rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0 5px;
+}
+
+/* ---------- Tabs between the Results and New run views ---------- */
+.tabs { display: flex; gap: 4px; margin-top: 16px; border-bottom: 1px solid var(--border); }
+.tabs a {
+  padding: 8px 14px;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs a:hover { color: var(--text); }
+.tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); }
+
+/* ---------- New run form ---------- */
+#run-form { max-width: 820px; }
+fieldset {
+  margin: 0 0 14px;
+  padding: 12px 16px 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+legend { font-weight: 600; padding: 0 4px; }
+fieldset label { display: block; margin-bottom: 12px; font-size: 0.9rem; font-weight: 600; }
+fieldset.two-col { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); column-gap: 16px; }
+fieldset.two-col legend { grid-column: 1 / -1; }
+fieldset input, fieldset select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+fieldset input:focus, fieldset select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.hint { display: block; margin-top: 4px; font-size: 0.82rem; font-weight: 400; color: var(--muted); }
+.hint.error, .error { color: var(--bad); }
+.notice { padding: 10px 14px; border-radius: 8px; }
+.notice.error { background: var(--bad-bg); }
+.form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0 8px; }
+button.primary, a.button.primary {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
+  padding: 8px 18px;
+}
+a.button { display: inline-block; border-radius: 6px; text-decoration: none; cursor: pointer; }
+@media (prefers-color-scheme: dark) {
+  button.primary, a.button.primary { color: #0f1115; }
+}
+
+/* ---------- Run progress ---------- */
+.progress-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 40px;
+}
+.progress-bar { height: 14px; margin: 10px 0 6px; background: var(--neutral-bg); border-radius: 7px; overflow: hidden; }
+.progress-bar span { display: block; height: 100%; width: 0; background: var(--bar); transition: width 0.4s ease; }
+.progress-bar.small { height: 6px; margin-top: 12px; }
+.progress-counts { font-variant-numeric: tabular-nums; }
+#run-stats { margin-top: 14px; }
+#run-errors ul { margin-bottom: 0; }
+

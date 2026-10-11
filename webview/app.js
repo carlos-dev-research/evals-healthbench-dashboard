@@ -1,11 +1,17 @@
-// HealthBench results dashboard: all the page's behavior.
+// HealthBench dashboard: shared helpers, view switching and the Results view.
+// (The New run view lives in run.js, which uses the helpers defined here.)
 //
 // Reads the runs that build.py wrote to data.js (window.HEALTHBENCH_RUNS and
 // window.HEALTHBENCH_ERRORS, loaded by a <script> tag before this file) and renders:
-//   - the runs table, with skipped folders listed underneath
+//   - the runs table, with each run's status and skipped folders listed underneath
 //   - the selected run's summary tiles and score histogram (hand-drawn SVG)
-//   - the searchable, sortable conversation list with rubric details
+//   - the searchable, sortable conversation list; each conversation shows the
+//     messages, the model response and every rubric criterion with its points,
+//     outcome and the grader's explanation
 //   - the Refresh button, which asks serve.py to rebuild data.js and reloads the page
+//
+// Views: the URL hash picks the view. "#new-run" shows the New run view; anything
+// else shows Results, with "#test-..." naming the selected run.
 //
 // Plain JavaScript with no build step. Conversation messages and model responses
 // are rendered as Markdown with marked and sanitized with DOMPurify (both in vendor/)
@@ -100,8 +106,11 @@ function renderRuns() {
     const bar = el("div", { class: "score-bar" }, el("span"));
     bar.firstChild.style.width = `${run.score * 100}%`;
 
+    // Runs made by this repo record their status; flag anything that didn't complete.
+    const status = run.status && run.status !== "completed"
+      ? el("span", { class: `pill status-${run.status}`, text: run.status }) : null;
     const row = el("tr", { "data-id": run.id },
-      el("td", {}, el("code", { text: run.id })),
+      el("td", {}, el("code", { text: run.id }), status ? " " : null, status),
       el("td", { text: run.model || "" }),
       el("td", { text: run.grader || "" }),
       el("td", { text: `${run.model_reasoning || "-"} / ${run.grader_reasoning || "-"}` }),
@@ -115,12 +124,12 @@ function renderRuns() {
 }
 
 // Show one run's details. The run id is stored in the URL hash (#test-...) so a reload keeps it.
-function selectRun(id) {
+function selectRun(id, updateHash = true) {
   state.run = RUNS.find((r) => r.id === id);
   document.querySelectorAll("#runs tbody tr").forEach((tr) => {
     tr.classList.toggle("selected", tr.dataset.id === id);
   });
-  history.replaceState(null, "", `#${id}`);
+  if (updateHash) history.replaceState(null, "", `#${id}`);
 
   document.getElementById("run").hidden = false;
   document.getElementById("run-title").textContent = id;
@@ -202,7 +211,7 @@ function matches(conversation, query) {
   const haystack = [
     ...conversation.prompt.map((m) => m.content),
     conversation.completion,
-    ...conversation.rubrics.map((r) => r.explanation),
+    ...conversation.rubrics.map((r) => `${r.criterion || ""}\n${r.explanation}`),
   ].join("\n").toLowerCase();
   return haystack.includes(query);
 }
@@ -267,11 +276,20 @@ function conversationBody(c) {
 
   const rows = c.rubrics.map((r, i) => {
     const kind = outcome(r);
+    // Criterion text and tags (e.g. "axis:accuracy") come from results.jsonl or the dataset;
+    // older runs without a local dataset only have the grader's explanation.
+    const criterion = r.criterion
+      ? el("div", { class: "criterion", text: r.criterion })
+      : el("div", { class: "criterion muted", text: "Criterion text not available (dataset not found in healthbench/)" });
+    const tags = r.tags && r.tags.length
+      ? el("div", { class: "tags" }, ...r.tags.map((t) => el("span", { class: "tag", text: t })))
+      : null;
     return el("tr", {},
       el("td", { class: "num muted", text: i + 1 }),
       el("td", { class: `points num ${r.points >= 0 ? "pos" : "neg"}`, text: r.points > 0 ? `+${r.points}` : r.points }),
       el("td", { class: "outcome" }, el("span", { class: `pill ${kind}`, text: kind })),
-      el("td", { text: r.explanation }),
+      el("td", { class: "criterion-cell" }, criterion, tags),
+      el("td", { class: "explanation", text: r.explanation }),
     );
   });
   body.append(
@@ -282,6 +300,7 @@ function conversationBody(c) {
           el("th", { class: "num", text: "#" }),
           el("th", { class: "num", text: "Points" }),
           el("th", { text: "Outcome" }),
+          el("th", { text: "Rubric criterion" }),
           el("th", { text: "Grader explanation" }),
         )),
         el("tbody", {}, ...rows),
@@ -322,14 +341,37 @@ async function refresh() {
   }
 }
 
+// ---------- views ----------
+
+function currentView() {
+  return location.hash === "#new-run" ? "new-run" : "results";
+}
+
+// Show the view named by the URL hash and highlight its tab.
+function showView() {
+  const view = currentView();
+  document.getElementById("view-results").hidden = view !== "results";
+  document.getElementById("view-new-run").hidden = view !== "new-run";
+  document.querySelectorAll(".tabs a").forEach((a) => {
+    if (a.dataset.view === view) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  // Back on Results: put the selected run back in the URL.
+  if (view === "results" && state.run && location.hash !== `#${state.run.id}`) {
+    history.replaceState(null, "", `#${state.run.id}`);
+  }
+}
+
 // ---------- init ----------
 
 document.getElementById("refresh").addEventListener("click", refresh);
 document.getElementById("search").addEventListener("input", renderConversations);
 document.getElementById("sort").addEventListener("change", renderConversations);
 document.getElementById("more").addEventListener("click", showMore);
+window.addEventListener("hashchange", showView);
 
 renderRuns();
 // Open the run named in the URL hash, or else the newest run.
 const initial = RUNS.find((r) => `#${r.id}` === location.hash) || RUNS[RUNS.length - 1];
-if (initial) selectRun(initial.id);
+if (initial) selectRun(initial.id, currentView() === "results");
+showView();

@@ -1,0 +1,8 @@
+# Needed to run evaluations (web UI "New run" view and eval.py).
+# Viewing results (serve.py, build.py) needs only the Python standard library.
+openai>=1.58          # chat completions with reasoning_effort and json_schema output
+python-dotenv>=1.0   # eval.py: reads settings from .env
+tqdm>=4.66           # eval.py: progress bar in the terminal
+
+# Optional, only for eval.ipynb (dataset exploration and subset sampling):
+#   pip install pandas numpy jupyterlab
