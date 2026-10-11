@@ -97,6 +97,9 @@ evals-healthbench-dashboard/
 │   ├── results.jsonl
 │   └── description.md
 ├── healthbench/        # Optional: original dataset for criterion text and tags (git-ignored)
+├── build.py            # Parses the runs into webview/data.js
+├── serve.py            # Serves webview/ on localhost
+├── webview/            # Static dashboard: index.html, app.js, style.css, data.js (generated)
 └── README.md
 ```
 
@@ -121,9 +124,16 @@ hf download openai/healthbench --repo-type dataset --local-dir ./healthbench
 
 The `healthbench/` folder is git-ignored and is not redistributed by this repo.
 
-### 3. Run the dashboard
+### 3. Build and view the dashboard
 
-_Setup and run instructions will be added with the dashboard code._
+Requires Python 3.11+, standard library only (no `pip install`).
+
+```bash
+python build.py   # parses every test-*/ folder into webview/data.js
+python serve.py   # serves webview/ at http://localhost:8000 (optional port: python serve.py 9000)
+```
+
+Because the data is loaded as a script, `webview/index.html` can also be opened directly from disk without the server. Re-run `build.py` after adding new runs.
 
 ## Current results
 
