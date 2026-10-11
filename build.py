@@ -1,6 +1,6 @@
 """Build step of the dashboard: turns the run folders into one data file.
 
-Scans every test-*/ folder in the repo root (the output format of
+Scans every test-*/ folder inside results/ (the output format of
 https://github.com/carlos-dev-research/evals-healthbench), and for each run:
 
   1. reads the metadata in description.md (models, reasoning effort, dataset),
@@ -28,7 +28,8 @@ import json
 import re
 from pathlib import Path
 
-ROOT = Path(__file__).parent              # repo root, where the test-*/ folders live
+ROOT = Path(__file__).parent              # repo root
+RESULTS = ROOT / "results"                # where the test-*/ run folders live
 OUTPUT = ROOT / "webview" / "data.js"     # generated file read by the page
 
 # description.md label -> key in the output
@@ -150,7 +151,7 @@ def build_run(folder: Path) -> dict:
 
 
 def main() -> dict:
-    '''Rewrite webview/data.js from the test-*/ folders currently on disk.
+    '''Rewrite webview/data.js from the results/test-*/ folders currently on disk.
 
     A broken run is skipped and reported instead of failing the whole build,
     so the output always reflects what is in the repo right now.
@@ -160,7 +161,8 @@ def main() -> dict:
     '''
     runs, errors = [], []
     # Sorted by name, which for test-YYYY-MM-DD_HH-MM-SS is oldest first.
-    for folder in sorted(p for p in ROOT.glob("test-*") if p.is_dir()):
+    # A missing results/ folder just means no runs yet.
+    for folder in sorted(p for p in RESULTS.glob("test-*") if p.is_dir()):
         if not (folder / "results.jsonl").exists():
             errors.append({"id": folder.name, "error": "results.jsonl not found"})
             continue

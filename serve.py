@@ -4,7 +4,7 @@ Serves the static files in webview/ (index.html, app.js, style.css, data.js)
 at http://localhost:8000, and keeps the data in sync with the repo:
 
   - On startup it runs the build (build.main()), so webview/data.js always
-    matches the test-*/ folders currently on disk.
+    matches the results/test-*/ folders currently on disk.
   - It exposes one endpoint, POST /api/refresh, which the page's Refresh
     button calls to re-run the build without restarting the server.
   - Every response is sent with "Cache-Control: no-store", so reloading the

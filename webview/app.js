@@ -7,8 +7,10 @@
 //   - the searchable, sortable conversation list with rubric details
 //   - the Refresh button, which asks serve.py to rebuild data.js and reloads the page
 //
-// Plain JavaScript with no libraries or build step. All text from the results
-// is inserted with textContent (never innerHTML), so model output can't inject HTML.
+// Plain JavaScript with no build step. Conversation messages and model responses
+// are rendered as Markdown with marked and sanitized with DOMPurify (both in vendor/)
+// before being inserted, so model output can't inject scripts. Everything else is
+// inserted with textContent.
 
 const RUNS = window.HEALTHBENCH_RUNS || [];
 const ERRORS = window.HEALTHBENCH_ERRORS || [];
@@ -30,6 +32,35 @@ function el(tag, attrs = {}, ...children) {
   for (const child of children) {
     if (child != null) node.append(child);
   }
+  return node;
+}
+
+// Render Markdown into a new element: GitHub-flavored Markdown (tables, lists, code)
+// with single line breaks kept, as chat output expects. The HTML is sanitized before
+// insertion; images and forms are dropped so model output can't load remote content.
+// Falls back to plain text if the vendor libraries didn't load.
+const MARKDOWN_READY = Boolean(window.marked && window.DOMPurify);
+if (MARKDOWN_READY) {
+  marked.setOptions({ gfm: true, breaks: true });
+  // Open links in a new tab, without giving the linked page access to this one.
+  DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank");
+      node.setAttribute("rel", "noopener noreferrer");
+    }
+  });
+}
+
+function markdown(source, className) {
+  const node = el("div", { class: className });
+  if (!MARKDOWN_READY) {
+    node.textContent = source;
+    node.classList.add("plain");
+    return node;
+  }
+  node.innerHTML = DOMPurify.sanitize(marked.parse(source || ""), {
+    FORBID_TAGS: ["img", "style", "form", "input", "button", "iframe"],
+  });
   return node;
 }
 
@@ -226,12 +257,12 @@ function conversationBody(c) {
   for (const message of c.prompt) {
     body.append(el("div", { class: "message" },
       el("div", { class: "role", text: message.role }),
-      el("div", { class: "text", text: message.content }),
+      markdown(message.content, "text markdown"),
     ));
   }
   body.append(el("div", { class: "message completion" },
     el("div", { class: "role", text: "Model response (evaluated)" }),
-    el("div", { class: "text", text: c.completion }),
+    markdown(c.completion, "text markdown"),
   ));
 
   const rows = c.rubrics.map((r, i) => {
@@ -262,7 +293,7 @@ function conversationBody(c) {
 
 // ---------- refresh ----------
 
-// Ask serve.py (POST /api/refresh) to rebuild data.js from the test-* folders, then reload.
+// Ask serve.py (POST /api/refresh) to rebuild data.js from the results/test-* folders, then reload.
 async function refresh() {
   const button = document.getElementById("refresh");
   const status = document.getElementById("refresh-status");
