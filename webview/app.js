@@ -1,12 +1,25 @@
-// HealthBench results dashboard. Reads window.HEALTHBENCH_RUNS from data.js (written by build.py).
+// HealthBench results dashboard: all the page's behavior.
+//
+// Reads the runs that build.py wrote to data.js (window.HEALTHBENCH_RUNS and
+// window.HEALTHBENCH_ERRORS, loaded by a <script> tag before this file) and renders:
+//   - the runs table, with skipped folders listed underneath
+//   - the selected run's summary tiles and score histogram (hand-drawn SVG)
+//   - the searchable, sortable conversation list with rubric details
+//   - the Refresh button, which asks serve.py to rebuild data.js and reloads the page
+//
+// Plain JavaScript with no libraries or build step. All text from the results
+// is inserted with textContent (never innerHTML), so model output can't inject HTML.
 
 const RUNS = window.HEALTHBENCH_RUNS || [];
-const PAGE_SIZE = 50;
+const ERRORS = window.HEALTHBENCH_ERRORS || [];
+const PAGE_SIZE = 50; // conversations rendered per "Show more" click
 
+// run: selected run; visible: conversations after search/sort; shown: how many are rendered
 const state = { run: null, visible: [], shown: 0 };
 
 // ---------- helpers ----------
 
+// Create a DOM element: el("td", { class: "num", text: "5" }, child1, child2).
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
@@ -32,6 +45,8 @@ function shortDataset(path) {
   return path ? path.split("/").pop() : "";
 }
 
+// Classify a graded criterion for the colored pill in the rubric table:
+// positive criteria are "earned" or "missed", negative ones "penalty" (met) or "avoided".
 function outcome(rubric) {
   if (rubric.points >= 0) return rubric.met ? "earned" : "missed";
   return rubric.met ? "penalty" : "avoided";
@@ -42,6 +57,13 @@ function outcome(rubric) {
 function renderRuns() {
   const tbody = document.querySelector("#runs tbody");
   document.getElementById("empty").hidden = RUNS.length > 0;
+
+  const skipped = document.getElementById("skipped");
+  skipped.hidden = ERRORS.length === 0;
+  skipped.replaceChildren(
+    el("strong", { text: `${ERRORS.length} folder(s) skipped:` }),
+    el("ul", {}, ...ERRORS.map((e) => el("li", {}, el("code", { text: e.id }), ` ${e.error}`))),
+  );
 
   for (const run of RUNS) {
     const bar = el("div", { class: "score-bar" }, el("span"));
@@ -61,6 +83,7 @@ function renderRuns() {
   }
 }
 
+// Show one run's details. The run id is stored in the URL hash (#test-...) so a reload keeps it.
 function selectRun(id) {
   state.run = RUNS.find((r) => r.id === id);
   document.querySelectorAll("#runs tbody tr").forEach((tr) => {
@@ -104,6 +127,7 @@ function renderHistogram() {
     counts[bin] += 1;
   }
 
+  // Draw in a fixed 760x220 coordinate space; the viewBox scales it to the container width.
   const width = 760, height = 220, left = 32, bottom = 24, top = 16;
   const plotW = width - left - 8, plotH = height - bottom - top;
   const max = Math.max(1, ...counts);
@@ -114,6 +138,7 @@ function renderHistogram() {
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", "Histogram of per-conversation scores");
 
+  // SVG elements need createElementNS, so they get their own small helper.
   const add = (tag, attrs, text) => {
     const node = document.createElementNS(ns, tag);
     for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
@@ -127,6 +152,7 @@ function renderHistogram() {
     const h = (count / max) * plotH;
     const x = left + i * slot + 3;
     const bar = add("rect", { class: "bar", x, y: top + plotH - h, width: slot - 6, height: h, rx: 2 });
+    // <title> gives the bar a hover tooltip, e.g. "0.4–0.5: 23".
     const title = document.createElementNS(ns, "title");
     title.textContent = i === 0 ? `score < 0: ${count}` : `${labels[i]}–${(i / 10).toFixed(1)}: ${count}`;
     bar.append(title);
@@ -139,6 +165,7 @@ function renderHistogram() {
 
 // ---------- conversations ----------
 
+// Case-insensitive search across the conversation, the model response and the grader explanations.
 function matches(conversation, query) {
   if (!query) return true;
   const haystack = [
@@ -149,11 +176,12 @@ function matches(conversation, query) {
   return haystack.includes(query);
 }
 
+// Re-filter and re-sort the conversation list, then render the first page.
 function renderConversations() {
   const query = document.getElementById("search").value.trim().toLowerCase();
   const sort = document.getElementById("sort").value;
   const list = state.run.conversations.filter((c) => matches(c, query));
-  const key = (c) => (c.score == null ? Infinity : c.score);
+  const key = (c) => (c.score == null ? Infinity : c.score); // unscored conversations sort last
   if (sort === "asc") list.sort((a, b) => key(a) - key(b));
   if (sort === "desc") list.sort((a, b) => key(b) - key(a));
 
@@ -164,6 +192,7 @@ function renderConversations() {
   showMore();
 }
 
+// Append the next PAGE_SIZE conversations, so long runs don't render everything at once.
 function showMore() {
   const container = document.getElementById("conversations");
   const next = state.visible.slice(state.shown, state.shown + PAGE_SIZE);
@@ -172,6 +201,7 @@ function showMore() {
   document.getElementById("more").hidden = state.shown >= state.visible.length;
 }
 
+// Collapsed row: number, last user message as a preview, points and score.
 function conversationItem(c) {
   const lastUser = [...c.prompt].reverse().find((m) => m.role === "user");
   const details = el("details", { class: "conversation" },
@@ -189,6 +219,7 @@ function conversationItem(c) {
   return details;
 }
 
+// Expanded view: every message, the evaluated response, and the rubric table.
 function conversationBody(c) {
   const body = el("div", { class: "body" });
 
@@ -229,12 +260,45 @@ function conversationBody(c) {
   return body;
 }
 
+// ---------- refresh ----------
+
+// Ask serve.py (POST /api/refresh) to rebuild data.js from the test-* folders, then reload.
+async function refresh() {
+  const button = document.getElementById("refresh");
+  const status = document.getElementById("refresh-status");
+  const setStatus = (text, isError = false) => {
+    status.textContent = text;
+    status.classList.toggle("error", isError);
+  };
+
+  // Opened straight from disk: there is no server to rebuild the data.
+  if (location.protocol === "file:") {
+    setStatus("Refresh needs the local server: run python serve.py, or run python build.py and reload.", true);
+    return;
+  }
+
+  button.disabled = true;
+  setStatus("Rebuilding…");
+  try {
+    const response = await fetch("/api/refresh", { method: "POST" });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    // data.js is loaded as a script, so reload the page to pick up the new runs.
+    location.reload();
+  } catch (error) {
+    setStatus(`Refresh failed: ${error.message}. Is serve.py running?`, true);
+    button.disabled = false;
+  }
+}
+
 // ---------- init ----------
 
+document.getElementById("refresh").addEventListener("click", refresh);
 document.getElementById("search").addEventListener("input", renderConversations);
 document.getElementById("sort").addEventListener("change", renderConversations);
 document.getElementById("more").addEventListener("click", showMore);
 
 renderRuns();
+// Open the run named in the URL hash, or else the newest run.
 const initial = RUNS.find((r) => `#${r.id}` === location.hash) || RUNS[RUNS.length - 1];
 if (initial) selectRun(initial.id);

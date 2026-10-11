@@ -1,3 +1,13 @@
+/*
+  HealthBench results dashboard: styles.
+
+  Plain CSS, no framework. Colors are defined once as variables in :root and
+  swapped for dark mode by the prefers-color-scheme block, so the page follows
+  the system theme. Sections below: base layout, tables and the runs list,
+  summary tiles, histogram, conversation list, and the rubric outcome pills.
+*/
+
+/* Light theme colors */
 :root {
   --bg: #f7f7f5;
   --surface: #ffffff;
@@ -13,6 +23,7 @@
   --bar: #2f6feb;
 }
 
+/* Dark theme colors, used when the system is in dark mode */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0f1115;
@@ -30,6 +41,7 @@
   }
 }
 
+/* ---------- Base layout and typography ---------- */
 * { box-sizing: border-box; }
 
 body {
@@ -54,6 +66,7 @@ code { font-size: 0.9em; }
 .muted { color: var(--muted); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
 
+/* ---------- Tables and the runs list ---------- */
 .table-wrap {
   overflow-x: auto;
   background: var(--surface);
@@ -76,11 +89,13 @@ tr:last-child td { border-bottom: none; }
 #runs tbody tr.selected { box-shadow: inset 3px 0 0 var(--accent); background: var(--neutral-bg); }
 #runs td { white-space: nowrap; }
 
+/* Score column: bar + number */
 .score-cell { display: flex; align-items: center; gap: 8px; min-width: 150px; }
 .score-bar { flex: 1; height: 8px; background: var(--neutral-bg); border-radius: 4px; overflow: hidden; }
 .score-bar span { display: block; height: 100%; background: var(--bar); }
 .score-cell strong { font-variant-numeric: tabular-nums; width: 3.2em; text-align: right; }
 
+/* ---------- Run summary tiles ---------- */
 .stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -95,6 +110,7 @@ tr:last-child td { border-bottom: none; }
 .stat .value { font-size: 1.5rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .stat .label { font-size: 0.85rem; color: var(--muted); }
 
+/* ---------- Score histogram (SVG drawn by app.js) ---------- */
 #histogram {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -106,6 +122,7 @@ tr:last-child td { border-bottom: none; }
 #histogram rect.bar { fill: var(--bar); }
 #histogram line { stroke: var(--border); }
 
+/* ---------- Search/sort controls and buttons ---------- */
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .controls input, .controls select, button {
   font: inherit;
@@ -116,8 +133,25 @@ tr:last-child td { border-bottom: none; }
   padding: 6px 10px;
 }
 .controls input { flex: 1; min-width: 220px; }
-button { cursor: pointer; margin: 12px 0 40px; }
+button { cursor: pointer; }
+button:disabled { cursor: wait; opacity: 0.6; }
+#more { margin: 12px 0 40px; }
 
+.section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 32px 0 12px; }
+.section-head h2 { margin: 0; }
+#refresh-status.error { color: var(--bad); }
+
+/* Box listing run folders that build.py skipped */
+.skipped {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: var(--bad);
+  background: var(--bad-bg);
+}
+.skipped ul { margin: 4px 0 0; padding-left: 20px; }
+
+/* ---------- Conversation list (collapsible <details>) ---------- */
 details.conversation {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -159,6 +193,7 @@ summary .badge { font-variant-numeric: tabular-nums; font-weight: 600; }
 }
 .message.completion .text { border-left: 3px solid var(--accent); }
 
+/* ---------- Rubric table: earned/avoided green, penalty red, missed gray ---------- */
 .rubrics td.points, .rubrics td.outcome { white-space: nowrap; }
 .pill { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: 600; }
 .pill.earned, .pill.avoided { color: var(--good); background: var(--good-bg); }

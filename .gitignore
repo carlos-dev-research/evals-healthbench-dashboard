@@ -222,3 +222,5 @@ __marimo__/
 healthbench
 .vscode
 .DS_Store
+# Temp file written by build.py
+webview/*.tmp
