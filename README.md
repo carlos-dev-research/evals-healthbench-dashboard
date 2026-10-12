@@ -32,8 +32,8 @@ Requires **Python 3.11+**. Developed with Python 3.12 in a Miniconda environment
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/carlos-dev-research/evals-healthbench-dashboard-.git
-cd evals-healthbench-dashboard-
+git clone https://github.com/carlos-dev-research/evals-healthbench-dashboard.git
+cd evals-healthbench-dashboard
 
 # 2. Create an environment and install the packages for running evaluations
 conda create -n evals python=3.12
